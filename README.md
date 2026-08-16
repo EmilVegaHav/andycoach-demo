@@ -2,7 +2,7 @@
 
 Demo navegable (sin backend) para mostrar el flujo de un coach y un cliente de entrenamiento personal. Los datos viven en `localStorage` del navegador.
 
-Un solo cliente de prueba: **Juan Pérez**, con un mesociclo de hipertrofia ya avanzado a la semana 3.
+Un solo cliente de prueba entra con `user` / `user`: **Juan Pérez**. El coach ve dos clientes: **Juan Pérez** y **Ana Gómez**.
 
 ## Cómo correrlo
 
@@ -11,13 +11,15 @@ npm install
 npm run dev
 ```
 
-Abrí [http://localhost:3000](http://localhost:3000).
+Abrí [http://localhost:3000](http://localhost:3000). Entras con:
 
-- Arriba a la derecha: **Cambiar a cliente / coach**
-- En el menú: **Restablecer datos** vuelve al ejemplo inicial
+- **Coach:** usuario `admin` · contraseña `admin`
+- **Cliente:** usuario `user` · contraseña `user`
+
+**Cerrar sesión** vuelve al login. **Restablecer datos** (en el menú) vuelve al ejemplo inicial sin cerrar la sesión.
 
 ## Qué probar
 
-**Coach:** resumen, mesociclos (crear uno nuevo), rutinas por microciclo, copiar semana anterior, notas, diario de Juan, medidas y progreso/volumen.
+**Coach:** listado de clientes, resumen de cada uno, mesociclos (crear uno nuevo), rutinas por microciclo, copiar semana anterior, notas, diario, medidas y progreso/volumen.
 
 **Cliente:** llenar el diario, registrar pesos y reps de la rutina, medidas/fotos, y el formulario de feedback cuando el coach lo habilita.

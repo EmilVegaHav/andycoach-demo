@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import { toISODate, startOfDay } from "@/lib/dates";
 import { Button, Card, Empty, Field, Input, Scale, Textarea, YesNo } from "@/components/ui";
 
 export default function ClientFeedback() {
-  const state = useDemo();
+  const state = useScopedDemo();
   const meso = state.mesocycles.find(
     (item) => item.feedbackEnabled || item.status === "completed",
   );

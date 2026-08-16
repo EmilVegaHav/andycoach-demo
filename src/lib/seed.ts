@@ -1,9 +1,13 @@
 import { addDays, startOfDay, toISODate } from "./dates";
 import { dayId } from "./ids";
+import { LOGGED_CLIENT_ID } from "./types";
 import type {
   DailyJournal,
   DemoState,
   ExerciseSection,
+  MeasurementEntry,
+  MeasurementField,
+  Mesocycle,
   RoutineExercise,
   SetLog,
   TrainingDay,
@@ -112,8 +116,9 @@ function logSession(
   return { session, logs, notes };
 }
 
-function journal(date: string, overrides: Partial<DailyJournal>): DailyJournal {
+function journal(clientId: string, date: string, overrides: Partial<DailyJournal> = {}): DailyJournal {
   return {
+    clientId,
     date,
     protein: 165,
     carbs: 240,
@@ -140,127 +145,201 @@ function journal(date: string, overrides: Partial<DailyJournal>): DailyJournal {
   };
 }
 
-export function createSeed(): DemoState {
-  const today = startOfDay(new Date());
-  const mesoStart = addDays(today, -14);
-  const mesoId = "meso-hipertrofia-1";
-  const dayNames = ["Torso", "Piernas", "Torso", "Piernas"];
+function measurementSet(clientId: string): MeasurementField[] {
+  return [
+    { id: `${clientId}-mf-peso`, label: "Peso", unit: "kg", type: "number", required: true, clientId },
+    { id: `${clientId}-mf-cintura`, label: "Cintura", unit: "cm", type: "number", required: true, clientId },
+    { id: `${clientId}-mf-cadera`, label: "Cadera", unit: "cm", type: "number", required: false, clientId },
+    { id: `${clientId}-mf-pecho`, label: "Pecho", unit: "cm", type: "number", required: false, clientId },
+    { id: `${clientId}-mf-frente`, label: "Foto frente", unit: "", type: "photo", required: true, clientId },
+    { id: `${clientId}-mf-lateral`, label: "Foto lateral", unit: "", type: "photo", required: true, clientId },
+  ];
+}
 
-  const trainingDays = buildEmptyDays(mesoId, dayNames);
+type ProgramInput = {
+  clientId: string;
+  mesoId: string;
+  mesoName: string;
+  startOffsetDays: number;
+  calorieTarget: number;
+  dayNames: string[];
+  templateWeeks: number;
+  templateForDay: (dayNumber: number, load: number) => ExerciseDraft[];
+  logged: Array<{ week: number; day: number; offset: number; extras?: Parameters<typeof logSession>[3] }>;
+  journals: DailyJournal[];
+  entries: MeasurementEntry[];
+};
+
+function buildProgram(input: ProgramInput, today: Date) {
+  const mesoStart = addDays(today, input.startOffsetDays);
+  const mesocycle: Mesocycle = {
+    id: input.mesoId,
+    clientId: input.clientId,
+    name: input.mesoName,
+    startDate: toISODate(mesoStart),
+    trainingDaysPerWeek: input.dayNames.length,
+    calorieTarget: input.calorieTarget,
+    status: "active",
+    feedbackEnabled: false,
+  };
+  const trainingDays = buildEmptyDays(input.mesoId, input.dayNames);
   const exercises: RoutineExercise[] = [];
-
-  for (const week of [1, 2, 3]) {
+  for (let week = 1; week <= input.templateWeeks; week += 1) {
     const load = (week - 1) * 2.5;
-    for (const dayNumber of [1, 2, 3, 4]) {
-      const id = dayId(mesoId, week, dayNumber);
-      const template = dayNumber % 2 === 1 ? torso(load) : piernas(load);
-      exercises.push(...addExercises(id, template));
-    }
+    input.dayNames.forEach((_, index) => {
+      const dayNumber = index + 1;
+      exercises.push(...addExercises(dayId(input.mesoId, week, dayNumber), input.templateForDay(dayNumber, load)));
+    });
   }
-
   const sessions: WorkoutSession[] = [];
   const setLogs: SetLog[] = [];
   const exerciseNotes: DemoState["exerciseNotes"] = [];
-
-  const logged: Array<{ week: number; day: number; offset: number; extras?: Parameters<typeof logSession>[3] }> = [
-    { week: 1, day: 1, offset: 0 },
-    { week: 1, day: 2, offset: 1 },
-    { week: 1, day: 3, offset: 3 },
-    { week: 1, day: 4, offset: 4 },
-    { week: 2, day: 1, offset: 7, extras: { noteExercise: "Press banca", note: "Me crujió un poco el hombro derecho en la última serie." } },
-    { week: 2, day: 2, offset: 8 },
-    { week: 2, day: 3, offset: 10 },
-    { week: 2, day: 4, offset: 11 },
-  ];
-
-  for (const item of logged) {
-    const id = dayId(mesoId, item.week, item.day);
-    const dayExercises = exercises.filter((exercise) => exercise.trainingDayId === id);
-    const result = logSession(id, toISODate(addDays(mesoStart, item.offset)), dayExercises, item.extras);
+  for (const item of input.logged) {
+    const id = dayId(input.mesoId, item.week, item.day);
+    const result = logSession(
+      id,
+      toISODate(addDays(mesoStart, item.offset)),
+      exercises.filter((exercise) => exercise.trainingDayId === id),
+      item.extras,
+    );
     sessions.push(result.session);
     setLogs.push(...result.logs);
     exerciseNotes.push(...result.notes);
   }
+  return { mesocycle, trainingDays, exercises, sessions, setLogs, exerciseNotes, journals: input.journals, entries: input.entries };
+}
 
-  const journals: DailyJournal[] = [];
-  for (let i = 9; i >= 1; i -= 1) {
-    const date = toISODate(addDays(today, -i));
-    const weekend = [0, 6].includes(addDays(today, -i).getDay());
-    journals.push(
-      journal(date, {
-        trained: !weekend || i === 4,
-        freeMeals: weekend && i === 2,
-        dietCompliance: weekend ? 3 : 4,
-        dietReason: weekend && i === 2 ? "Cumpleaños familiar, comí fuera." : "",
-        hunger: weekend ? 2 : 3,
-        hasSoreness: i === 8 || i === 7,
-        sorenessMuscles: i === 8 ? "Pectoral y deltoides" : i === 7 ? "Cuádriceps" : "",
-        steps: 7800 + i * 180,
-        sleepHours: 6.5 + (i % 3) * 0.5,
-        motivation: i === 3 ? 2 : 4,
-        fatigue: i === 3 ? 4 : 3,
+export function createSeed(): DemoState {
+  const today = startOfDay(new Date());
+  const juanId = LOGGED_CLIENT_ID;
+  const anaId = "client-ana";
+
+  const juan = buildProgram(
+    {
+      clientId: juanId,
+      mesoId: "meso-juan-hipertrofia-1",
+      mesoName: "Hipertrofia · bloque 1",
+      startOffsetDays: -14,
+      calorieTarget: 2400,
+      dayNames: ["Torso", "Piernas", "Torso", "Piernas"],
+      templateWeeks: 3,
+      templateForDay: (day, load) => (day % 2 === 1 ? torso(load) : piernas(load)),
+      logged: [
+        { week: 1, day: 1, offset: 0 },
+        { week: 1, day: 2, offset: 1 },
+        { week: 1, day: 3, offset: 3 },
+        { week: 1, day: 4, offset: 4 },
+        { week: 2, day: 1, offset: 7, extras: { noteExercise: "Press banca", note: "Me crujió un poco el hombro derecho en la última serie." } },
+        { week: 2, day: 2, offset: 8 },
+        { week: 2, day: 3, offset: 10 },
+        { week: 2, day: 4, offset: 11 },
+      ],
+      journals: Array.from({ length: 9 }, (_, idx) => {
+        const i = 9 - idx;
+        const date = toISODate(addDays(today, -i));
+        const weekend = [0, 6].includes(addDays(today, -i).getDay());
+        return journal(juanId, date, {
+          trained: !weekend || i === 4,
+          freeMeals: weekend && i === 2,
+          dietCompliance: weekend ? 3 : 4,
+          dietReason: weekend && i === 2 ? "Cumpleaños familiar, comí fuera." : "",
+          hunger: weekend ? 2 : 3,
+          hasSoreness: i === 8 || i === 7,
+          sorenessMuscles: i === 8 ? "Pectoral y deltoides" : i === 7 ? "Cuádriceps" : "",
+          steps: 7800 + i * 180,
+          sleepHours: 6.5 + (i % 3) * 0.5,
+          motivation: i === 3 ? 2 : 4,
+          fatigue: i === 3 ? 4 : 3,
+        });
       }),
-    );
-  }
+      entries: [
+        {
+          id: "me-juan-inicio",
+          clientId: juanId,
+          date: toISODate(addDays(today, -14)),
+          values: { [`${juanId}-mf-peso`]: 86.2, [`${juanId}-mf-cintura`]: 94, [`${juanId}-mf-cadera`]: 102, [`${juanId}-mf-pecho`]: 108, [`${juanId}-mf-frente`]: null, [`${juanId}-mf-lateral`]: null },
+        },
+        {
+          id: "me-juan-reciente",
+          clientId: juanId,
+          date: toISODate(addDays(today, -2)),
+          values: { [`${juanId}-mf-peso`]: 85.1, [`${juanId}-mf-cintura`]: 92.5, [`${juanId}-mf-cadera`]: 101, [`${juanId}-mf-pecho`]: 108.5, [`${juanId}-mf-frente`]: null, [`${juanId}-mf-lateral`]: null },
+        },
+      ],
+    },
+    today,
+  );
+
+  const ana = buildProgram(
+    {
+      clientId: anaId,
+      mesoId: "meso-ana-recomp-1",
+      mesoName: "Recomposición · bloque 1",
+      startOffsetDays: -7,
+      calorieTarget: 1900,
+      dayNames: ["Empuje", "Tirón", "Piernas"],
+      templateWeeks: 2,
+      templateForDay: (day, load) => {
+        if (day === 3) return piernas(load - 20);
+        return torso(load - 20);
+      },
+      logged: [
+        { week: 1, day: 1, offset: 0 },
+        { week: 1, day: 2, offset: 2 },
+        { week: 1, day: 3, offset: 4, extras: { noteExercise: "Sentadilla trasera", note: "Profundo bien, pero me temblaron las piernas en la última." } },
+      ],
+      journals: Array.from({ length: 6 }, (_, idx) => {
+        const i = 6 - idx;
+        const date = toISODate(addDays(today, -i));
+        return journal(anaId, date, {
+          protein: 130,
+          carbs: 180,
+          fats: 55,
+          dietCompliance: i === 2 ? 2 : 5,
+          dietReason: i === 2 ? "Viaje de trabajo, comí en restaurante." : "",
+          trained: i !== 3,
+          steps: 10000 + i * 120,
+          sleepHours: 7 + (i % 2) * 0.5,
+          stress: i === 2 ? 4 : 2,
+          motivation: 5,
+          hunger: 2,
+        });
+      }),
+      entries: [
+        {
+          id: "me-ana-inicio",
+          clientId: anaId,
+          date: toISODate(addDays(today, -7)),
+          values: { [`${anaId}-mf-peso`]: 68.4, [`${anaId}-mf-cintura`]: 74, [`${anaId}-mf-cadera`]: 98, [`${anaId}-mf-pecho`]: 92, [`${anaId}-mf-frente`]: null, [`${anaId}-mf-lateral`]: null },
+        },
+        {
+          id: "me-ana-reciente",
+          clientId: anaId,
+          date: toISODate(addDays(today, -1)),
+          values: { [`${anaId}-mf-peso`]: 67.9, [`${anaId}-mf-cintura`]: 73.5, [`${anaId}-mf-cadera`]: 97.5, [`${anaId}-mf-pecho`]: 92, [`${anaId}-mf-frente`]: null, [`${anaId}-mf-lateral`]: null },
+        },
+      ],
+    },
+    today,
+  );
 
   return {
+    loggedIn: false,
     role: "coach",
-    client: {
-      id: "client-juan",
-      name: "Juan Pérez",
-      email: "juan.perez@email.com",
-    },
-    mesocycles: [
-      {
-        id: mesoId,
-        name: "Hipertrofia · bloque 1",
-        startDate: toISODate(mesoStart),
-        trainingDaysPerWeek: 4,
-        calorieTarget: 2400,
-        status: "active",
-        feedbackEnabled: false,
-      },
+    selectedClientId: juanId,
+    clients: [
+      { id: juanId, name: "Juan Pérez", email: "juan.perez@email.com" },
+      { id: anaId, name: "Ana Gómez", email: "ana.gomez@email.com" },
     ],
-    trainingDays,
-    exercises,
-    sessions,
-    setLogs,
-    exerciseNotes,
-    journals,
-    measurementFields: [
-      { id: "mf-peso", label: "Peso", unit: "kg", type: "number", required: true },
-      { id: "mf-cintura", label: "Cintura", unit: "cm", type: "number", required: true },
-      { id: "mf-cadera", label: "Cadera", unit: "cm", type: "number", required: false },
-      { id: "mf-pecho", label: "Pecho", unit: "cm", type: "number", required: false },
-      { id: "mf-frente", label: "Foto frente", unit: "", type: "photo", required: true },
-      { id: "mf-lateral", label: "Foto lateral", unit: "", type: "photo", required: true },
-    ],
-    measurementEntries: [
-      {
-        id: "me-inicio",
-        date: toISODate(mesoStart),
-        values: {
-          "mf-peso": 86.2,
-          "mf-cintura": 94,
-          "mf-cadera": 102,
-          "mf-pecho": 108,
-          "mf-frente": null,
-          "mf-lateral": null,
-        },
-      },
-      {
-        id: "me-reciente",
-        date: toISODate(addDays(today, -2)),
-        values: {
-          "mf-peso": 85.1,
-          "mf-cintura": 92.5,
-          "mf-cadera": 101,
-          "mf-pecho": 108.5,
-          "mf-frente": null,
-          "mf-lateral": null,
-        },
-      },
-    ],
+    mesocycles: [juan.mesocycle, ana.mesocycle],
+    trainingDays: [...juan.trainingDays, ...ana.trainingDays],
+    exercises: [...juan.exercises, ...ana.exercises],
+    sessions: [...juan.sessions, ...ana.sessions],
+    setLogs: [...juan.setLogs, ...ana.setLogs],
+    exerciseNotes: [...juan.exerciseNotes, ...ana.exerciseNotes],
+    journals: [...juan.journals, ...ana.journals],
+    measurementFields: [...measurementSet(juanId), ...measurementSet(anaId)],
+    measurementEntries: [...juan.entries, ...ana.entries],
     feedbackForms: [],
     feedbackResponses: [],
   };

@@ -1,12 +1,12 @@
 "use client";
 
 import { formatShort } from "@/lib/dates";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import { weekVolume } from "@/lib/volume";
 import { Card, Empty } from "@/components/ui";
 
 export default function ProgressPage() {
-  const state = useDemo();
+  const state = useScopedDemo();
   const meso = state.mesocycles.find((item) => item.status === "active") ?? state.mesocycles[0];
 
   if (!meso) return <Empty title="Sin mesociclo" body="Crea un mesociclo para ver volumen y cargas." />;
@@ -15,7 +15,10 @@ export default function ProgressPage() {
   const max = Math.max(...volumes, 1);
   const notes = [...state.exerciseNotes].reverse();
   const weightSeries = state.measurementEntries
-    .map((entry) => ({ date: entry.date, peso: entry.values["mf-peso"] }))
+    .map((entry) => ({
+      date: entry.date,
+      peso: Object.entries(entry.values).find(([key, value]) => key.includes("mf-peso") && typeof value === "number")?.[1],
+    }))
     .filter((item) => typeof item.peso === "number");
 
   return (

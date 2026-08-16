@@ -6,6 +6,7 @@ import { currentWeekNumber, formatShort, weekRange } from "@/lib/dates";
 import { useDemo } from "@/lib/store";
 import { Button, Card, Empty, Field, Input, Select } from "@/components/ui";
 import { uid } from "@/lib/ids";
+import { clientById } from "@/lib/selectors";
 import type { FeedbackFieldType } from "@/lib/types";
 
 export default function MesocyclePage({ params }: { params: Promise<{ id: string }> }) {
@@ -159,7 +160,7 @@ export default function MesocyclePage({ params }: { params: Promise<{ id: string
         </div>
         {response ? (
           <div className="rounded-xl bg-paper p-4 text-sm">
-            <p className="mb-2 font-medium">Respuesta de {state.client.name}</p>
+            <p className="mb-2 font-medium">Respuesta de {clientById(state, meso.clientId).name}</p>
             {fields.map((field) => (
               <p key={field.id} className="mt-1">
                 <span className="text-muted">{field.label}: </span>

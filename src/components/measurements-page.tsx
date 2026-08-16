@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatShort, toISODate, startOfDay } from "@/lib/dates";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import type { FieldType } from "@/lib/types";
 import { Button, Card, Empty, Field, Input, Select } from "@/components/ui";
 
@@ -20,7 +20,7 @@ function readFile(file: File): Promise<string> {
 }
 
 export function MeasurementsPage({ role }: { role: "coach" | "client" }) {
-  const state = useDemo();
+  const state = useScopedDemo();
   const [date, setDate] = useState(toISODate(startOfDay()));
   const existing = state.measurementEntries.find((entry) => entry.date === date);
   const [values, setValues] = useState<Record<string, number | string | null>>(existing?.values ?? {});
@@ -34,7 +34,8 @@ export function MeasurementsPage({ role }: { role: "coach" | "client" }) {
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-muted">{role === "coach" ? "Coach" : "Cliente"}</p>
-        <h1 className="font-display text-4xl italic">Medidas y fotos</h1>
+          <h1 className="font-display text-4xl italic">Medidas y fotos</h1>
+          {role === "coach" ? <p className="text-muted">{state.client.name}</p> : null}
       </div>
 
       {role === "coach" ? (
@@ -86,6 +87,7 @@ export function MeasurementsPage({ role }: { role: "coach" | "client" }) {
               state.dispatch({
                 type: "ADD_MEASUREMENT_FIELD",
                 field: {
+                  clientId: state.client.id,
                   label: String(data.get("label")),
                   unit: String(data.get("unit") || ""),
                   type: String(data.get("type")) as FieldType,
@@ -116,7 +118,9 @@ export function MeasurementsPage({ role }: { role: "coach" | "client" }) {
                 value={date}
                 onChange={(event) => {
                   setDate(event.target.value);
-                  const found = state.measurementEntries.find((entry) => entry.date === event.target.value);
+                  const found = state.measurementEntries.find(
+                    (entry) => entry.date === event.target.value && entry.clientId === state.client.id,
+                  );
                   setValues(found?.values ?? {});
                 }}
               />
@@ -161,7 +165,10 @@ export function MeasurementsPage({ role }: { role: "coach" | "client" }) {
             {error ? <p className="text-sm text-red-700">{error}</p> : null}
             <Button
               onClick={() =>
-                state.dispatch({ type: "SAVE_MEASUREMENT_ENTRY", entry: { date, values } })
+                state.dispatch({
+                  type: "SAVE_MEASUREMENT_ENTRY",
+                  entry: { clientId: state.client.id, date, values },
+                })
               }
             >
               Guardar medidas

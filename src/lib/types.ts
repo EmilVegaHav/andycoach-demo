@@ -16,6 +16,7 @@ export type ClientProfile = {
 
 export type Mesocycle = {
   id: string;
+  clientId: string;
   name: string;
   startDate: string;
   trainingDaysPerWeek: number;
@@ -66,6 +67,7 @@ export type ExerciseNote = {
 };
 
 export type DailyJournal = {
+  clientId: string;
   date: string;
   protein: number | null;
   carbs: number | null;
@@ -92,6 +94,7 @@ export type DailyJournal = {
 
 export type MeasurementField = {
   id: string;
+  clientId: string;
   label: string;
   unit: string;
   type: FieldType;
@@ -100,6 +103,7 @@ export type MeasurementField = {
 
 export type MeasurementEntry = {
   id: string;
+  clientId: string;
   date: string;
   values: Record<string, number | string | null>;
 };
@@ -121,9 +125,13 @@ export type FeedbackResponse = {
   submittedAt: string;
 };
 
+export const LOGGED_CLIENT_ID = "client-juan";
+
 export type DemoState = {
+  loggedIn: boolean;
   role: Role;
-  client: ClientProfile;
+  selectedClientId: string;
+  clients: ClientProfile[];
   mesocycles: Mesocycle[];
   trainingDays: TrainingDay[];
   exercises: RoutineExercise[];

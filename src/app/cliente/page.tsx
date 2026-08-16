@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { currentWeekNumber, formatShort, toISODate, startOfDay } from "@/lib/dates";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import { Card } from "@/components/ui";
 
 export default function ClientHome() {
-  const state = useDemo();
+  const state = useScopedDemo();
   const today = toISODate(startOfDay());
   const meso = state.mesocycles.find((item) => item.status === "active") ?? state.mesocycles[0];
   const week = meso ? currentWeekNumber(meso.startDate) : 1;

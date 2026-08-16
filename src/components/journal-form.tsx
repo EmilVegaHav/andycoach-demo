@@ -6,6 +6,7 @@ import type { DailyJournal } from "@/lib/types";
 import { Button, Field, Input, Scale, Textarea, YesNo } from "@/components/ui";
 
 const empty = (date: string, defaults?: Partial<DailyJournal>): DailyJournal => ({
+  clientId: defaults?.clientId ?? "",
   date,
   protein: null,
   carbs: null,

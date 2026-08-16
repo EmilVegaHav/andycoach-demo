@@ -11,6 +11,7 @@ import {
 } from "react";
 import { dayId, defaultDayNames, uid } from "./ids";
 import { createSeed } from "./seed";
+import { scopeForClient } from "./selectors";
 import type {
   DailyJournal,
   DemoState,
@@ -23,16 +24,20 @@ import type {
   Role,
   RoutineExercise,
 } from "./types";
+import { LOGGED_CLIENT_ID } from "./types";
 
-const STORAGE_KEY = "andy-coach-demo-v1";
+const STORAGE_KEY = "andy-coach-demo-v3";
 
 type Action =
   | { type: "HYDRATE"; state: DemoState }
   | { type: "RESET" }
+  | { type: "LOGIN"; role: Role }
+  | { type: "LOGOUT" }
+  | { type: "SELECT_CLIENT"; id: string }
   | { type: "SET_ROLE"; role: Role }
   | {
       type: "CREATE_MESOCYCLE";
-      payload: Pick<Mesocycle, "name" | "startDate" | "trainingDaysPerWeek" | "calorieTarget" | "status"> & {
+      payload: Pick<Mesocycle, "name" | "startDate" | "trainingDaysPerWeek" | "calorieTarget" | "status" | "clientId"> & {
         dayNames: string[];
       };
     }
@@ -86,9 +91,31 @@ function buildDays(mesocycleId: string, dayNames: string[]) {
 function reducer(state: DemoState, action: Action): DemoState {
   switch (action.type) {
     case "HYDRATE":
-      return action.state;
+      return {
+        ...createSeed(),
+        ...action.state,
+        loggedIn: Boolean(action.state.loggedIn),
+        clients: action.state.clients?.length ? action.state.clients : createSeed().clients,
+        selectedClientId: action.state.selectedClientId || LOGGED_CLIENT_ID,
+      };
     case "RESET":
-      return createSeed();
+      return {
+        ...createSeed(),
+        loggedIn: state.loggedIn,
+        role: state.role,
+        selectedClientId: state.role === "client" ? LOGGED_CLIENT_ID : state.selectedClientId,
+      };
+    case "LOGIN":
+      return {
+        ...state,
+        loggedIn: true,
+        role: action.role,
+        selectedClientId: action.role === "client" ? LOGGED_CLIENT_ID : state.selectedClientId,
+      };
+    case "LOGOUT":
+      return { ...state, loggedIn: false };
+    case "SELECT_CLIENT":
+      return { ...state, selectedClientId: action.id };
     case "SET_ROLE":
       return { ...state, role: action.role };
     case "CREATE_MESOCYCLE": {
@@ -99,6 +126,7 @@ function reducer(state: DemoState, action: Action): DemoState {
           : defaultDayNames(action.payload.trainingDaysPerWeek);
       const mesocycle: Mesocycle = {
         id,
+        clientId: action.payload.clientId,
         name: action.payload.name,
         startDate: action.payload.startDate,
         trainingDaysPerWeek: action.payload.trainingDaysPerWeek,
@@ -243,7 +271,9 @@ function reducer(state: DemoState, action: Action): DemoState {
       return {
         ...state,
         journals: [
-          ...state.journals.filter((item) => item.date !== action.entry.date),
+          ...state.journals.filter(
+            (item) => !(item.date === action.entry.date && item.clientId === action.entry.clientId),
+          ),
           action.entry,
         ].sort((a, b) => a.date.localeCompare(b.date)),
       };
@@ -266,11 +296,18 @@ function reducer(state: DemoState, action: Action): DemoState {
       };
     case "SAVE_MEASUREMENT_ENTRY": {
       const id = action.entry.id ?? uid("me");
-      const next = { id, date: action.entry.date, values: action.entry.values };
+      const next = {
+        id,
+        clientId: action.entry.clientId,
+        date: action.entry.date,
+        values: action.entry.values,
+      };
       return {
         ...state,
         measurementEntries: [
-          ...state.measurementEntries.filter((item) => item.id !== id && item.date !== next.date),
+          ...state.measurementEntries.filter(
+            (item) => item.id !== id && !(item.date === next.date && item.clientId === next.clientId),
+          ),
           next,
         ].sort((a, b) => a.date.localeCompare(b.date)),
       };
@@ -333,4 +370,9 @@ export function useDemo() {
   const context = useContext(DemoContext);
   if (!context) throw new Error("useDemo must be used inside DemoProvider");
   return context;
+}
+
+export function useScopedDemo() {
+  const state = useDemo();
+  return { ...state, ...scopeForClient(state) };
 }

@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useState } from "react";
 import { currentWeekNumber, formatShort, toISODate, startOfDay } from "@/lib/dates";
 import { defaultDayNames } from "@/lib/ids";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import { Button, Card, Empty, Field, Input, Modal, Select } from "@/components/ui";
 
 export default function MesocyclesPage() {
-  const { mesocycles, dispatch } = useDemo();
+  const { mesocycles, dispatch, client } = useScopedDemo();
   const [open, setOpen] = useState(false);
   const [days, setDays] = useState(4);
   const [names, setNames] = useState(defaultDayNames(4));
@@ -24,12 +24,13 @@ export default function MesocyclesPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-muted">Programación</p>
           <h1 className="font-display text-4xl italic">Mesociclos</h1>
+          <p className="text-sm text-muted">{client.name}</p>
         </div>
         <Button onClick={() => setOpen(true)}>Nuevo mesociclo</Button>
       </div>
 
       {mesocycles.length === 0 ? (
-        <Empty title="Sin mesociclos" body="Crea el primer bloque de 12 semanas para Juan." />
+        <Empty title="Sin mesociclos" body={`Crea el primer bloque de 12 semanas para ${client.name}.`} />
       ) : (
         <div className="space-y-3">
           {mesocycles.map((meso) => {
@@ -63,6 +64,7 @@ export default function MesocyclesPage() {
             dispatch({
               type: "CREATE_MESOCYCLE",
               payload: {
+                clientId: client.id,
                 name: String(data.get("name") || "Nuevo mesociclo"),
                 startDate: String(data.get("startDate") || toISODate(startOfDay())),
                 trainingDaysPerWeek: days,

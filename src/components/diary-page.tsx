@@ -2,12 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { addDays, formatLong, startOfDay, toISODate } from "@/lib/dates";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import { JournalForm } from "@/components/journal-form";
 import { Card, cn } from "@/components/ui";
 
 export function DiaryPage({ readOnly }: { readOnly: boolean }) {
-  const state = useDemo();
+  const state = useScopedDemo();
   const today = toISODate(startOfDay());
   const [date, setDate] = useState(today);
   const meso = state.mesocycles.find((item) => item.status === "active") ?? state.mesocycles[0];
@@ -19,7 +19,10 @@ export function DiaryPage({ readOnly }: { readOnly: boolean }) {
       <div>
         <p className="text-xs uppercase tracking-[0.2em] text-muted">{readOnly ? "Coach" : "Cliente"}</p>
         <h1 className="font-display text-4xl italic">Diario</h1>
-        <p className="text-muted">{formatLong(date)}</p>
+        <p className="text-muted">
+          {readOnly ? `${state.client.name} · ` : ""}
+          {formatLong(date)}
+        </p>
       </div>
       <div className="flex gap-1 overflow-x-auto pb-1">
         {dates.map((item) => {
@@ -41,7 +44,7 @@ export function DiaryPage({ readOnly }: { readOnly: boolean }) {
       </div>
       <Card>
         {readOnly && !entry ? (
-          <p className="text-sm text-muted">Juan no registró este día todavía.</p>
+          <p className="text-sm text-muted">{state.client.name} no registró este día todavía.</p>
         ) : (
           <JournalForm
             key={date}
@@ -49,7 +52,9 @@ export function DiaryPage({ readOnly }: { readOnly: boolean }) {
             calorieTarget={meso?.calorieTarget}
             initial={entry ?? undefined}
             readOnly={readOnly}
-            onSave={(next) => state.dispatch({ type: "SAVE_JOURNAL", entry: { ...next, date } })}
+            onSave={(next) =>
+              state.dispatch({ type: "SAVE_JOURNAL", entry: { ...next, date, clientId: state.client.id } })
+            }
           />
         )}
       </Card>

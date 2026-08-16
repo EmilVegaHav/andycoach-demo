@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { currentWeekNumber } from "@/lib/dates";
-import { useDemo } from "@/lib/store";
+import { useScopedDemo } from "@/lib/store";
 import { Card, Empty } from "@/components/ui";
 
 export default function TrainingIndex() {
-  const state = useDemo();
+  const state = useScopedDemo();
   const meso = state.mesocycles.find((item) => item.status === "active") ?? state.mesocycles[0];
   if (!meso) return <Empty title="Sin rutina" body="Tu coach todavía no armó un mesociclo." />;
   const current = currentWeekNumber(meso.startDate);
