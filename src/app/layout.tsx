@@ -15,7 +15,7 @@ const newsreader = Newsreader({
 });
 
 export const metadata: Metadata = {
-  title: "Andy — demo de coaching",
+  title: "AndyCoach — demo de coaching",
   description: "Demo de plataforma para coaches de entrenamiento personal.",
 };
 
